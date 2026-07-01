@@ -1,78 +1,64 @@
 # Backend 2 - Product Service
 
-Backend en Python (Flask) para gestión de productos con base de datos MySQL.
+API REST en Python/Flask para gestión de productos, desplegada en AWS ECS Fargate con base de datos MySQL en Amazon RDS.
 
-## Características
+## Arquitectura
 
-- API REST para gestión de productos
-- CRUD completo de productos
-- Búsqueda por nombre, precio y stock
-- Base de datos MySQL
-- Configuración vía archivo .env
-
-## Requisitos
-
-- Python 3.8 o superior
-- MySQL 8.0 o superior
-- pip
-
-## Configuración
-
-1. Copiar el archivo de ejemplo:
-```bash
-cp .env.example .env
-```
-
-2. Editar `.env` con sus credenciales de MySQL:
-```
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=tu_password
-DB_NAME=products_db
-PORT=8082
-```
-
-3. Crear la base de datos en MySQL:
-```sql
-CREATE DATABASE products_db;
-```
-
-## Instalación
-
-```bash
-pip install -r requirements.txt
-```
-
-## Ejecutar
-
-```bash
-python app.py
-```
-
-El servidor iniciará en el puerto 8082.
+- **Tecnología**: Python 3.11 + Flask + MySQL Connector
+- **Contenedor**: Docker
+- **Orquestación**: AWS ECS Fargate
+- **Base de datos**: Amazon RDS MySQL 8.0 (`products_db`)
+- **Secrets**: Credenciales de BD almacenadas en AWS SSM Parameter Store
+- **Logs**: CloudWatch Logs (`/ecs/product-service`)
 
 ## Endpoints
 
-- `POST /api/products` - Crear nuevo producto
-- `GET /api/products` - Obtener todos los productos
-- `GET /api/products/{id}` - Obtener producto por ID
-- `GET /api/products/search?name=xxx` - Buscar productos por nombre
-- `GET /api/products/search?minPrice=xxx&maxPrice=yyy` - Buscar por rango de precio
-- `GET /api/products/search?minStock=xxx` - Buscar por stock mínimo
-- `PUT /api/products/{id}` - Actualizar producto
-- `DELETE /api/products/{id}` - Eliminar producto
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/products` | Obtener todos los productos |
+| GET | `/api/products/:id` | Obtener producto por ID |
+| POST | `/api/products` | Crear nuevo producto |
+| PUT | `/api/products/:id` | Actualizar producto |
+| DELETE | `/api/products/:id` | Eliminar producto |
+| GET | `/api/products/search` | Buscar productos por nombre/precio/stock |
 
-## Ejemplo de Uso
+## Pipeline CI/CD
 
-Crear producto:
+Cada commit a `main` dispara automáticamente el workflow `.github/workflows/deploy.yml`:
+1. **Build**: construye la imagen Docker
+2. **Push**: sube la imagen a Amazon ECR
+3. **Deploy**: fuerza un nuevo despliegue en ECS
+
+## Variables de entorno
+
+| Variable | Descripción | Fuente |
+|----------|-------------|--------|
+| `DB_HOST` | Host de RDS MySQL | SSM Parameter Store |
+| `DB_PASSWORD` | Contraseña de la BD | SSM Parameter Store (SecureString) |
+| `DB_PORT` | Puerto MySQL (3306) | Task Definition |
+| `DB_USER` | Usuario MySQL (admin) | Task Definition |
+| `DB_NAME` | Nombre de la BD (products_db) | Task Definition |
+| `PORT` | Puerto del servidor (8082) | Task Definition |
+
+## Autoscaling
+
+Configurado con Target Tracking al 50% de CPU:
+- Mínimo: 1 task
+- Máximo: 3 tasks
+
+## Cómo ejecutar localmente
+
 ```bash
-curl -X POST http://localhost:8082/api/products \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Laptop HP","description":"Laptop de 15.6 pulgadas","price":899.99,"stock":15,"icon":"💻"}'
+cp .env.example .env
+# Editar .env con credenciales locales
+pip install -r requirements.txt
+python app.py
 ```
 
-Obtener productos:
-```bash
-curl http://localhost:8082/api/products
-```
+## Estructura del proyecto
+BackPy_Eval3/
+├── app.py                     # API REST principal
+├── requirements.txt           # Dependencias Python
+├── Dockerfile                 # Imagen Docker
+└── .github/workflows/
+└── deploy.yml             # Pipeline CI/CD
